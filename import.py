@@ -32,21 +32,24 @@ def import_files(filenames):
         return False
     try:
         print("importing files: {}".format(" ".join(filenames)))
-        out = subprocess.check_output("git-annex import {}".format(" ".join(filenames)),
-                                      env=os.environ) # TODO: hack for PATH
+        cmd = "git-annex import '{}'".format(" ".join(filenames))
+        print(str(os.stat(filenames[0])))
+        print("cmd = {}".format(cmd))
+        out = subprocess.check_output(cmd, shell=True, env=os.environ) # TODO: hack for PATH
         return True
     except subprocess.CalledProcessError as e:
-        print("error in import: {code}\noutput:\n{output}".format(code=e.code, output=e.output))
+        print("error in import: {code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
         return False
     
 def add_metadata_to_imported_file(m):
-    addmdcmd = "git -c annex.alwayscommit=false annex metadata {fname} -s '{key}={value}' --quiet"
-    for k,v in m:
+    addmdcmd = "git -c annex.alwayscommit=false annex metadata '{fname}' -s '{key}={value}' --quiet"
+    for k,v in m.items():
         if k not in WANTED_KEYS: continue
 
         try:
             fn = m["filename_for_git_annex"]
             out = subprocess.check_output(addmdcmd.format(fname=fn, key=k, value=v),
+                                          shell=True,
                                           env=os.environ) # TODO: hack for PATH
             return True
         except subprocess.CalledProcessError as e:
@@ -76,10 +79,11 @@ if __name__ == '__main__':
     filenames = " ".join(sys.argv[2:])
 
     jstr = subprocess.check_output("exiftool -json {}".format(filenames), shell=True)
-    mlist = json.loads(jstr)
-    for m_raw in mlist:
-        m = defaultdict(lambda : "unknown")
-        m.update(m_raw)
+    raw_mlist = json.loads(jstr)
+
+    mlist = [defaultdict(lambda: "unknown", **m_raw) for m_raw in raw_mlist]
+
+    for m in mlist:
         source_file_name = m['SourceFile']
         print("\nimporting " + source_file_name)
         m["filename_for_git_annex"] = filename_from_metadata(m)
