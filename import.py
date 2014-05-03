@@ -24,7 +24,7 @@ def filename_from_metadata(m):
     datestr, timestr = datetimestr.split(" ")
     year, month, day = datestr.split(":")
     timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S") 
-    filename = time.strftime("%H:%M:%S-%B-%d-%Y")
+    filename = time.strftime("%H:%M:%S-%B-%d-%Y", timestruct)
     return filename + extension
     
 def import_files(filenames):
