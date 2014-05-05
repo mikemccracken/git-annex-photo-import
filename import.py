@@ -9,6 +9,9 @@ import shutil
 import time
 import tempfile
 
+#TODO py3.3 uses shlex.quote
+from pipes import quote
+
 USE_STAGING = True              # rename into temp dir
 
 WANTED_KEYS = ['CreateDate', 'GPSLongitude', 'GPSLatitude', 'ImageDescription', 'Model']
@@ -51,7 +54,7 @@ def import_files(filenames):
                 return False
     
 def add_metadata_to_imported_file(m):
-    addmdcmd = "git -c annex.alwayscommit=false annex metadata '{fname}' -s '{key}={value}' --quiet"
+    addmdcmd = "git -c annex.alwayscommit=false annex metadata \"{fname}\" -s \"{key}={value}\" --quiet"
     ts = timestruct_from_metadata(m)
 
     m.update(dict(Year=ts.tm_year,
@@ -59,16 +62,19 @@ def add_metadata_to_imported_file(m):
                   Day=ts.tm_mday))
 
     for k,v in m.items():
+
         if k not in WANTED_KEYS: continue
 
         try:
             fn = m["filename_for_git_annex"]
-            out = subprocess.check_output(addmdcmd.format(fname=fn, key=k, value=v),
-                                          shell=True,
+            cmd = addmdcmd.format(fname=fn, key=quote(str(k)), value=quote(str(v)))
+            print("\t - " + cmd)
+            out = subprocess.check_output(cmd, shell=True,                                    
+                                          stderr=subprocess.STDOUT,
                                           env=os.environ) # TODO: hack for PATH
-            return True
         except subprocess.CalledProcessError as e:
-            print("error in import: {code}\noutput:\n{output}".format(code=e.code, output=e.output))
+            print("error in add_metadata_to_imported_file:"
+                  "{code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
             return False
 
 # TODO:
