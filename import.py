@@ -118,6 +118,7 @@ if __name__ == '__main__':
     success = import_files(files_to_import)
     if success == False:
         # todo: remove temp dir?
+        print("errors importing files. exiting.")
         sys.exit()
 
     for m in mlist:
