@@ -14,7 +14,7 @@ from pipes import quote
 
 USE_STAGING = True              # rename into temp dir
 
-WANTED_KEYS = ['CreateDate', 'GPSLongitude', 'GPSLatitude', 'ImageDescription', 'Model']
+WANTED_KEYS = ['CreateDate', 'GPSLongitude', 'GPSLatitude', 'ImageDescription', 'Model', 'Year', 'Month', 'Day']
 # for reference while hacking:
 ALL_KEYS = ['YResolution', 'GPSImgDirectionRef', 'ResolutionUnit', 'FilePermissions', 'GPSLongitude', 'Make', 'SourceFile', 'FlashpixVersion', 'SceneCaptureType', 'ThumbnailImage', 'SubjectArea', 'Directory', 'YCbCrPositioning', 'XResolution', 'GPSPosition', 'Aperture', 'Compression', 'GPSAltitudeRef', 'GPSTimeStamp', 'BitsPerSample', 'GPSImgDirection', 'ModifyDate', 'LightValue', 'ExposureProgram', 'ShutterSpeed', 'ShutterSpeedValue', 'ColorSpace', 'FocalLength35efl', 'ExifImageWidth', 'ThumbnailOffset', 'DateTimeOriginal', 'ImageWidth', 'ThumbnailLength', 'CreateDate', 'MIMEType', 'SensingMethod', 'FNumber', 'Flash', 'ApertureValue', 'FocalLength', 'FileType', 'ImageDescription', 'ComponentsConfiguration', 'ExifByteOrder', 'FileAccessDate', 'ExifImageHeight', 'ImageHeight', 'EncodingProcess', 'FileInodeChangeDate', 'Model', 'ExifToolVersion', 'GPSLongitudeRef', 'YCbCrSubSampling', 'Software', 'ExposureTime', 'Orientation', 'MeteringMode', 'GPSLatitude', 'Sharpness', 'GPSLatitudeRef', 'ColorComponents', 'FileName', 'WhiteBalance', 'GPSAltitude', 'FileSize', 'FileModifyDate', 'ExposureMode', 'ImageSize', 'ISO', 'DigitalZoomRatio', 'ExifVersion']
 
@@ -78,7 +78,6 @@ def add_metadata_to_imported_file(m):
             return False
 
 # TODO:
-# - set metadata for year, month, day
 # - set metadata for place name using google apis: http://maps.googleapis.com/maps/api/geocode/json?latlng=53.244921,-4.479539&sensor=true
 
 
