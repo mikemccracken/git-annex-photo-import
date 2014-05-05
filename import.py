@@ -31,16 +31,24 @@ def filename_from_metadata(m):
 def import_files(filenames):
     if len(filenames) == 0:
         return False
-    try:
-        print("importing files: {}".format(" ".join(filenames)))
-        cmd = "git-annex import '{}'".format(" ".join(filenames))
-        print(str(os.stat(filenames[0])))
-        print("cmd = {}".format(cmd))
-        out = subprocess.check_output(cmd, shell=True, env=os.environ) # TODO: hack for PATH
-        return True
-    except subprocess.CalledProcessError as e:
-        print("error in import: {code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
-        return False
+    # TODO: calling import per file is less efficient but helps with
+    # errors. is there a better way?
+
+    for filename in filenames:
+        try:
+            print("importing {}".format(filename))
+            cmd = "git-annex import '{}'".format(filename)
+            out = subprocess.check_output(cmd, shell=True, 
+                                          stderr=subprocess.STDOUT,
+                                          env=os.environ) # TODO: hack for PATH
+            print("- success")
+        except subprocess.CalledProcessError as e:
+            if e.returncode == 1 and "not overwriting existing" in e.output:
+                print("- skipping existing file.")
+            else:
+                print("error in import: {code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
+                print("stopping import.")
+                return False
     
 def add_metadata_to_imported_file(m):
     addmdcmd = "git -c annex.alwayscommit=false annex metadata '{fname}' -s '{key}={value}' --quiet"
