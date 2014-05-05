@@ -16,14 +16,15 @@ WANTED_KEYS = ['CreateDate', 'GPSLongitude', 'GPSLatitude', 'ImageDescription', 
 ALL_KEYS = ['YResolution', 'GPSImgDirectionRef', 'ResolutionUnit', 'FilePermissions', 'GPSLongitude', 'Make', 'SourceFile', 'FlashpixVersion', 'SceneCaptureType', 'ThumbnailImage', 'SubjectArea', 'Directory', 'YCbCrPositioning', 'XResolution', 'GPSPosition', 'Aperture', 'Compression', 'GPSAltitudeRef', 'GPSTimeStamp', 'BitsPerSample', 'GPSImgDirection', 'ModifyDate', 'LightValue', 'ExposureProgram', 'ShutterSpeed', 'ShutterSpeedValue', 'ColorSpace', 'FocalLength35efl', 'ExifImageWidth', 'ThumbnailOffset', 'DateTimeOriginal', 'ImageWidth', 'ThumbnailLength', 'CreateDate', 'MIMEType', 'SensingMethod', 'FNumber', 'Flash', 'ApertureValue', 'FocalLength', 'FileType', 'ImageDescription', 'ComponentsConfiguration', 'ExifByteOrder', 'FileAccessDate', 'ExifImageHeight', 'ImageHeight', 'EncodingProcess', 'FileInodeChangeDate', 'Model', 'ExifToolVersion', 'GPSLongitudeRef', 'YCbCrSubSampling', 'Software', 'ExposureTime', 'Orientation', 'MeteringMode', 'GPSLatitude', 'Sharpness', 'GPSLatitudeRef', 'ColorComponents', 'FileName', 'WhiteBalance', 'GPSAltitude', 'FileSize', 'FileModifyDate', 'ExposureMode', 'ImageSize', 'ISO', 'DigitalZoomRatio', 'ExifVersion']
 
 
+def timestruct_from_metadata(m):
+    datetimestr = m["CreateDate"]
+    timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S") 
+    return timestruct
+
 def filename_from_metadata(m):
     sourcefilename = m["SourceFile"]
     ignore, extension = os.path.splitext(sourcefilename)
-    
-    datetimestr = m["CreateDate"]
-    datestr, timestr = datetimestr.split(" ")
-    year, month, day = datestr.split(":")
-    timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S") 
+    timestruct = timestruct_from_metadata(m)
     filename = time.strftime("%H:%M:%S-%B-%d-%Y", timestruct)
     return filename + extension
     
@@ -43,6 +44,12 @@ def import_files(filenames):
     
 def add_metadata_to_imported_file(m):
     addmdcmd = "git -c annex.alwayscommit=false annex metadata '{fname}' -s '{key}={value}' --quiet"
+    ts = timestruct_from_metadata(m)
+
+    m.update(dict(Year=ts.tm_year,
+                  Month=ts.tm_mon,
+                  Day=ts.tm_mday))
+
     for k,v in m.items():
         if k not in WANTED_KEYS: continue
 
