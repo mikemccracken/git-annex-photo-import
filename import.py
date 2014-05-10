@@ -127,6 +127,7 @@ if __name__ == '__main__':
 
     for m in mlist:
         add_metadata_to_imported_file(m)
-    
-        
-    # todo remove temp dir
+            
+    if staging_dir != "":
+        logging.debug("removing {}".format(staging_dir))
+        shutil.rmtree(staging_dir)
