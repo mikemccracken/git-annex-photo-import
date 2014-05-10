@@ -1,13 +1,14 @@
 #! python3
 
 from collections import defaultdict
-import os
 import json
+import logging
+import os
+import shutil
 import subprocess
 import sys
-import shutil
-import time
 import tempfile
+import time
 
 #TODO py3.3 uses shlex.quote
 from pipes import quote
