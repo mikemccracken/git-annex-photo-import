@@ -19,6 +19,8 @@ WANTED_KEYS = ['CreateDate', 'GPSLongitude', 'GPSLongitudeRef', 'GPSLatitude', '
 # for reference while hacking:
 ALL_KEYS = ['YResolution', 'GPSImgDirectionRef', 'ResolutionUnit', 'FilePermissions', 'GPSLongitude', 'Make', 'SourceFile', 'FlashpixVersion', 'SceneCaptureType', 'ThumbnailImage', 'SubjectArea', 'Directory', 'YCbCrPositioning', 'XResolution', 'GPSPosition', 'Aperture', 'Compression', 'GPSAltitudeRef', 'GPSTimeStamp', 'BitsPerSample', 'GPSImgDirection', 'ModifyDate', 'LightValue', 'ExposureProgram', 'ShutterSpeed', 'ShutterSpeedValue', 'ColorSpace', 'FocalLength35efl', 'ExifImageWidth', 'ThumbnailOffset', 'DateTimeOriginal', 'ImageWidth', 'ThumbnailLength', 'CreateDate', 'MIMEType', 'SensingMethod', 'FNumber', 'Flash', 'ApertureValue', 'FocalLength', 'FileType', 'ImageDescription', 'ComponentsConfiguration', 'ExifByteOrder', 'FileAccessDate', 'ExifImageHeight', 'ImageHeight', 'EncodingProcess', 'FileInodeChangeDate', 'Model', 'ExifToolVersion', 'GPSLongitudeRef', 'YCbCrSubSampling', 'Software', 'ExposureTime', 'Orientation', 'MeteringMode', 'GPSLatitude', 'Sharpness', 'GPSLatitudeRef', 'ColorComponents', 'FileName', 'WhiteBalance', 'GPSAltitude', 'FileSize', 'FileModifyDate', 'ExposureMode', 'ImageSize', 'ISO', 'DigitalZoomRatio', 'ExifVersion']
 
+logging.basicConfig(filename='git-annex-photo-import.log', level=logging.DEBUG)
+
 
 def timestruct_from_metadata(m):
     datetimestr = m["CreateDate"]
@@ -40,18 +42,18 @@ def import_files(filenames):
 
     for filename in filenames:
         try:
-            print("importing {}".format(filename))
+            logging.info("importing {}".format(filename))
             cmd = "git-annex import '{}'".format(filename)
             out = subprocess.check_output(cmd, shell=True, 
                                           stderr=subprocess.STDOUT,
                                           env=os.environ) # TODO: hack for PATH
-            print("- success")
+            logging.info("- success")
         except subprocess.CalledProcessError as e:
             if e.returncode == 1 and "not overwriting existing" in e.output:
-                print("- skipping existing file.")
+                logging.warn("- skipping existing file.")
             else:
-                print("error in import: {code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
-                print("stopping import.")
+                logging.error("error in import: {code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
+                logging.info("stopping import.")
                 return False
     
 def add_metadata_to_imported_file(m):
@@ -69,12 +71,12 @@ def add_metadata_to_imported_file(m):
         try:
             fn = m["filename_for_git_annex"]
             cmd = addmdcmd.format(fname=fn, key=quote(str(k)), value=quote(str(v)))
-            print("\t - " + cmd)
+            logging.debug("\t - " + cmd)
             out = subprocess.check_output(cmd, shell=True,                                    
                                           stderr=subprocess.STDOUT,
                                           env=os.environ) # TODO: hack for PATH
         except subprocess.CalledProcessError as e:
-            print("error in add_metadata_to_imported_file:"
+            logging.error("error in add_metadata_to_imported_file:"
                   "{code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
             return False
 
@@ -91,7 +93,7 @@ if __name__ == '__main__':
     
     if USE_STAGING:
         staging_dir = tempfile.mkdtemp("git-annex-import", dir="/tmp")
-        print("using staging dir ={}".format(staging_dir))
+        logging.info("using staging dir ={}".format(staging_dir))
     else:
         staging_dir = ""
 
@@ -106,20 +108,21 @@ if __name__ == '__main__':
 
     for m in mlist:
         source_file_name = m['SourceFile']
-        print("\nimporting " + source_file_name)
         m["filename_for_git_annex"] = filename_from_metadata(m)
         filename_for_git_annex = os.path.join(staging_dir, m["filename_for_git_annex"])
-        print(" rename to " + filename_for_git_annex)
         if USE_STAGING:
+            logging.info("copying {} to {}".format(source_file_name, filename_for_git_annex))
             shutil.copy2(source_file_name, filename_for_git_annex)
         else:
+            logging.info("moving {} to {}".format(source_file_name, filename_for_git_annex))
             shutil.move(source_file_name, filename_for_git_annex)
+
         files_to_import.append(filename_for_git_annex)
         
     success = import_files(files_to_import)
     if success == False:
         # todo: remove temp dir?
-        print("errors importing files. exiting.")
+        logging.error("errors importing files. exiting.")
         sys.exit()
 
     for m in mlist:
