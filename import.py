@@ -58,11 +58,6 @@ def import_files(filenames):
     
 def add_metadata_to_imported_file(m):
     addmdcmd = "git -c annex.alwayscommit=false annex metadata \"{fname}\" -s \"{key}={value}\" --quiet"
-    ts = timestruct_from_metadata(m)
-
-    m.update(dict(Year=ts.tm_year,
-                  Month=ts.tm_mon,
-                  Day=ts.tm_mday))
 
     for k,v in m.items():
 
@@ -126,6 +121,12 @@ if __name__ == '__main__':
         sys.exit()
 
     for m in mlist:
+        ts = timestruct_from_metadata(m)
+
+        m.update(dict(Year=ts.tm_year,
+                  Month=ts.tm_mon,
+                  Day=ts.tm_mday))
+
         add_metadata_to_imported_file(m)
             
     if staging_dir != "":
