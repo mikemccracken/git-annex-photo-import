@@ -162,16 +162,25 @@ def GetGps(data):
 
   return latitude, longitude, altitude
 
+UNKNOWN_PLACE_DICT = {"Formatted Address": "unknown",
+                      "County": "unknown",
+                      "State": "unknown",
+                      "Country": "unknown",
+                      "Locality": "unknown",
+                      "Neighborhood": "unknown",
+                      "Postal Code": "unknown",
+                      "Route": "unknown"}
+
 def place_info_from_metadata(m):
     gps = GetGps(m)
     if gps is None:
         logging.info("no lat, lng for file {}, skipping".format(m["SourceFile"]))
-        return {}
+        return UNKNOWN_PLACE_DICT
 
     lat, lng, alt = gps
     if "unknown" in [lat, lng]:
         logging.info("no lat, lng for file {}, skipping".format(m["SourceFile"]))
-        return {}
+        return UNKNOWN_PLACE_DICT
 
     ut = "http://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&sensor=false"
     url = ut.format(lat=lat, lng=lng)
