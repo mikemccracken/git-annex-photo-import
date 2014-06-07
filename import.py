@@ -52,7 +52,7 @@ def timestruct_from_metadata(m):
 
 def filename_from_metadata(m):
     sourcefilename = m["SourceFile"]
-    basename = os.path.basename(sourcefile)
+    basename = os.path.basename(sourcefilename)
     base, extension = os.path.splitext(basename)
     timestruct = timestruct_from_metadata(m)
     filename = time.strftime("%H:%M:%S-%B-%d-%Y", timestruct)
