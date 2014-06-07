@@ -10,20 +10,36 @@ import sys
 import tempfile
 import time
 
+import exifread
+USE_EXIFREAD = True
+
+#from urllib.request import urlopen
+from urllib import urlopen
+
 #TODO py3.3 uses shlex.quote
 from pipes import quote
 
 USE_STAGING = True              # rename into temp dir
 
-WANTED_KEYS = ['CreateDate', 'GPSLongitude', 'GPSLongitudeRef', 'GPSLatitude', 'GPSLatitudeRef', 'ImageDescription', 'Model', 'Year', 'Month', 'Day', 'SourceFile', 'GPSImgDirection', 'GPSImgDirectionRef', 'GPSAltitude', 'GPSAltitudeRef']
+WANTED_KEYS_EXIFTOOL = ['CreateDate', 'GPSLongitude', 'GPSLongitudeRef', 'GPSLatitude', 'GPSLatitudeRef', 'ImageDescription', 'Model', 'Year', 'Month', 'Day', 'SourceFile', 'GPSImgDirection', 'GPSImgDirectionRef', 'GPSAltitude', 'GPSAltitudeRef']
 # for reference while hacking:
-ALL_KEYS = ['YResolution', 'GPSImgDirectionRef', 'ResolutionUnit', 'FilePermissions', 'GPSLongitude', 'Make', 'SourceFile', 'FlashpixVersion', 'SceneCaptureType', 'ThumbnailImage', 'SubjectArea', 'Directory', 'YCbCrPositioning', 'XResolution', 'GPSPosition', 'Aperture', 'Compression', 'GPSAltitudeRef', 'GPSTimeStamp', 'BitsPerSample', 'GPSImgDirection', 'ModifyDate', 'LightValue', 'ExposureProgram', 'ShutterSpeed', 'ShutterSpeedValue', 'ColorSpace', 'FocalLength35efl', 'ExifImageWidth', 'ThumbnailOffset', 'DateTimeOriginal', 'ImageWidth', 'ThumbnailLength', 'CreateDate', 'MIMEType', 'SensingMethod', 'FNumber', 'Flash', 'ApertureValue', 'FocalLength', 'FileType', 'ImageDescription', 'ComponentsConfiguration', 'ExifByteOrder', 'FileAccessDate', 'ExifImageHeight', 'ImageHeight', 'EncodingProcess', 'FileInodeChangeDate', 'Model', 'ExifToolVersion', 'GPSLongitudeRef', 'YCbCrSubSampling', 'Software', 'ExposureTime', 'Orientation', 'MeteringMode', 'GPSLatitude', 'Sharpness', 'GPSLatitudeRef', 'ColorComponents', 'FileName', 'WhiteBalance', 'GPSAltitude', 'FileSize', 'FileModifyDate', 'ExposureMode', 'ImageSize', 'ISO', 'DigitalZoomRatio', 'ExifVersion']
+ALL_KEYS_EXIFTOOL = ['YResolution', 'GPSImgDirectionRef', 'ResolutionUnit', 'FilePermissions', 'GPSLongitude', 'Make', 'SourceFile', 'FlashpixVersion', 'SceneCaptureType', 'ThumbnailImage', 'SubjectArea', 'Directory', 'YCbCrPositioning', 'XResolution', 'GPSPosition', 'Aperture', 'Compression', 'GPSAltitudeRef', 'GPSTimeStamp', 'BitsPerSample', 'GPSImgDirection', 'ModifyDate', 'LightValue', 'ExposureProgram', 'ShutterSpeed', 'ShutterSpeedValue', 'ColorSpace', 'FocalLength35efl', 'ExifImageWidth', 'ThumbnailOffset', 'DateTimeOriginal', 'ImageWidth', 'ThumbnailLength', 'CreateDate', 'MIMEType', 'SensingMethod', 'FNumber', 'Flash', 'ApertureValue', 'FocalLength', 'FileType', 'ImageDescription', 'ComponentsConfiguration', 'ExifByteOrder', 'FileAccessDate', 'ExifImageHeight', 'ImageHeight', 'EncodingProcess', 'FileInodeChangeDate', 'Model', 'ExifToolVersion', 'GPSLongitudeRef', 'YCbCrSubSampling', 'Software', 'ExposureTime', 'Orientation', 'MeteringMode', 'GPSLatitude', 'Sharpness', 'GPSLatitudeRef', 'ColorComponents', 'FileName', 'WhiteBalance', 'GPSAltitude', 'FileSize', 'FileModifyDate', 'ExposureMode', 'ImageSize', 'ISO', 'DigitalZoomRatio', 'ExifVersion']
+
+
+WANTED_KEYS_EXIFREAD = ['EXIF DateTimeOriginal', 'GPS GPSLongitude', 'GPS GPSLongitudeRef', 'GPS GPSLatitude', 'GPS GPSLatitudeRef', 'Image ImageDescription', 'Image Model', 'GPS GPSImgDirection', 'GPS GPSImgDirectionRef', 'GPS GPSAltitude', 'GPS GPSAltitudeRef']
+
+GEOCODE_KEYS = ['County', 'Formatted Address', 'State', 'Country', 'Locality', 'Neighborhood', 'Postal Code', 'Route'] 
+WANTED_KEYS = ['Year', 'Month', 'Day', 'SourceFile'] + WANTED_KEYS_EXIFREAD + GEOCODE_KEYS
+
+CREATION_DATE_KEY = 'EXIF DateTimeOriginal'
 
 logging.basicConfig(filename='git-annex-photo-import.log', level=logging.DEBUG)
 
 
 def timestruct_from_metadata(m):
-    datetimestr = m["CreateDate"]
+    datetimestr = m[CREATION_DATE_KEY]
+    if USE_EXIFREAD:
+        datetimestr = datetimestr.values
     timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S") 
     return timestruct
 
@@ -33,7 +49,7 @@ def filename_from_metadata(m):
     timestruct = timestruct_from_metadata(m)
     filename = time.strftime("%H:%M:%S-%B-%d-%Y", timestruct)
     return filename + extension
-    
+
 def import_files(filenames):
     if len(filenames) == 0:
         return False
@@ -57,15 +73,19 @@ def import_files(filenames):
                 return False
     
 def add_metadata_to_imported_file(m):
-    addmdcmd = "git -c annex.alwayscommit=false annex metadata \"{fname}\" -s \"{key}={value}\" --quiet"
+    addmdcmd = "git -c annex.alwayscommit=false annex metadata \"{fname}\" -s {kvstr} --quiet"
 
     for k,v in m.items():
 
-        if k not in WANTED_KEYS: continue
+        if k not in WANTED_KEYS: 
+            continue
+
+        key = k.split(" ")[-1]
 
         try:
             fn = m["filename_for_git_annex"]
-            cmd = addmdcmd.format(fname=fn, key=quote(str(k)), value=quote(str(v)))
+            kvstr = quote("{key}={value}".format(key=str(key), value=str(v)))
+            cmd = addmdcmd.format(fname=fn, kvstr=kvstr)
             logging.debug("\t - " + cmd)
             out = subprocess.check_output(cmd, shell=True,                                    
                                           stderr=subprocess.STDOUT,
@@ -75,8 +95,121 @@ def add_metadata_to_imported_file(m):
                   "{code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
             return False
 
-# TODO:
-# - set metadata for place name using google apis: http://maps.googleapis.com/maps/api/geocode/json?latlng=53.244921,-4.479539&sensor=true
+# NOTE: DmsToDecimal and GetGps are from
+# https://developers.google.com/kml/articles/geotagsimple, and as per
+# that page are licensed as Apache 2.0 License.
+def DmsToDecimal(degree_num, degree_den, minute_num, minute_den,
+                 second_num, second_den):
+  """Converts the Degree/Minute/Second formatted GPS data to decimal degrees.
+
+  Args:
+    degree_num: The numerator of the degree object.
+    degree_den: The denominator of the degree object.
+    minute_num: The numerator of the minute object.
+    minute_den: The denominator of the minute object.
+    second_num: The numerator of the second object.
+    second_den: The denominator of the second object.
+
+  Returns:
+    A deciminal degree.
+  """
+
+  degree = float(degree_num)/float(degree_den)
+  minute = float(minute_num)/float(minute_den)/60
+  second = float(second_num)/float(second_den)/3600
+  return degree + minute + second
+
+
+def GetGps(data):
+  """Parses out the GPS coordinates from the file.
+
+  Args:
+    data: A dict object representing the Exif headers of the photo.
+
+  Returns:
+    A tuple representing the latitude, longitude, and altitude of the photo.
+  """
+
+  lat_dms = data['GPS GPSLatitude'].values
+  long_dms = data['GPS GPSLongitude'].values
+  latitude = DmsToDecimal(lat_dms[0].num, lat_dms[0].den,
+                          lat_dms[1].num, lat_dms[1].den,
+                          lat_dms[2].num, lat_dms[2].den)
+  longitude = DmsToDecimal(long_dms[0].num, long_dms[0].den,
+                           long_dms[1].num, long_dms[1].den,
+                           long_dms[2].num, long_dms[2].den)
+  if data['GPS GPSLatitudeRef'].printable == 'S': latitude *= -1
+  if data['GPS GPSLongitudeRef'].printable == 'W': longitude *= -1
+  altitude = None
+
+  try:
+    alt = data['GPS GPSAltitude'].values[0]
+    altitude = alt.num/alt.den
+    if data['GPS GPSAltitudeRef'] == 1: altitude *= -1
+
+  except KeyError:
+    altitude = 0
+
+  return latitude, longitude, altitude
+
+def place_info_from_metadata(m):
+    lat, lng, alt = GetGps(m)
+    if "unknown" in [lat, lng]:
+        logging.debug("no lat, lng for file {}, skipping".format(m["SourceFile"]))
+        return {}
+
+    ut = "http://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&sensor=false"
+    url = ut.format(lat=lat, lng=lng)
+
+    response = urlopen(url)
+    data = json.load(response)
+
+    if data['status'] != 'OK':
+        logging.debug("error in geocoding: " + str(data))
+        return {}
+
+    # for now, just get most specific result and use its address components:
+    d = data['results'][0]
+
+    m = {}
+    m["Formatted Address"] = d["formatted_address"]
+
+    # super hacky and US-centric:
+    actypemap = {"administrative_area_level_2": "County",
+                 "administrative_area_level_1": "State",
+                 "country": "Country",
+                 "locality": "Locality",
+                 "neighborhood": "Neighborhood",
+                 "postal_code": "Postal Code",
+                 "route": "Route"}
+
+    for ac in d['address_components']:
+        actype = ac['types'][0]
+        if actype in actypemap:
+            m[actypemap[actype]] = ac["long_name"]
+
+    import pprint
+    pprint.pprint(m)
+
+    return m
+    
+
+def get_metadata_using_exiftool(filenames):
+    filenames = " ".join(filenames)
+    jstr = subprocess.check_output("exiftool -json {}".format(quote(filenames)), shell=True)
+    raw_mlist = json.loads(jstr)
+    mlist = [defaultdict(lambda: "unknown", **m_raw) for m_raw in raw_mlist]
+    return mlist
+
+def get_metadata_using_exifread(filenames):
+    mlist = []
+    for fn in filenames:
+        with open(fn) as f:
+            # details = false to avoid parsing thumbs for now:
+            m = exifread.process_file(f, 'unknown', details=False)
+            m["SourceFile"] = os.path.abspath(fn)
+            mlist.append(m)
+    return mlist
 
 
 if __name__ == '__main__':
@@ -94,12 +227,8 @@ if __name__ == '__main__':
 
     files_to_import = []
 
-    filenames = " ".join(sys.argv[2:])
-
-    jstr = subprocess.check_output("exiftool -json {}".format(filenames), shell=True)
-    raw_mlist = json.loads(jstr)
-
-    mlist = [defaultdict(lambda: "unknown", **m_raw) for m_raw in raw_mlist]
+    #mlist = get_metadata_using_exiftool(sys.argv[2:])
+    mlist = get_metadata_using_exifread(sys.argv[2:])
 
     for m in mlist:
         source_file_name = m['SourceFile']
@@ -127,8 +256,12 @@ if __name__ == '__main__':
                   Month=ts.tm_mon,
                   Day=ts.tm_mday))
 
+        m.update(place_info_from_metadata(m))
+
         add_metadata_to_imported_file(m)
             
     if staging_dir != "":
         logging.debug("removing {}".format(staging_dir))
         shutil.rmtree(staging_dir)
+
+#TODO - commit at end
