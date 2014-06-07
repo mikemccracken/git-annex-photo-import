@@ -37,6 +37,12 @@ logging.basicConfig(filename='git-annex-photo-import.log', level=logging.DEBUG)
 
 
 def timestruct_from_metadata(m):
+    if CREATION_DATE_KEY not in m:
+        sourcefilename = m["SourceFile"]
+        st = os.stat(sourcefilename)
+        timestruct = time.localtime(st.st_mtime)
+        # NOTE: os x ctime seems odd so I go with mtime, which is what the Finder reports as "created" anyway
+        return timestruct
     datetimestr = m[CREATION_DATE_KEY]
     if USE_EXIFREAD:
         datetimestr = datetimestr.values
@@ -129,6 +135,9 @@ def GetGps(data):
   Returns:
     A tuple representing the latitude, longitude, and altitude of the photo.
   """
+  if ('GPS GPSLatitude' not in data or
+      'GPS GPSLongitude' not in data):
+      return None
 
   lat_dms = data['GPS GPSLatitude'].values
   long_dms = data['GPS GPSLongitude'].values
@@ -153,7 +162,10 @@ def GetGps(data):
   return latitude, longitude, altitude
 
 def place_info_from_metadata(m):
-    lat, lng, alt = GetGps(m)
+    gps = GetGps(m)
+    if gps is None: return m
+
+    lat, lng, alt = gps
     if "unknown" in [lat, lng]:
         logging.debug("no lat, lng for file {}, skipping".format(m["SourceFile"]))
         return {}
@@ -265,3 +277,4 @@ if __name__ == '__main__':
         shutil.rmtree(staging_dir)
 
 #TODO - commit at end
+# TODO: exifread doesn't do MOV :(
