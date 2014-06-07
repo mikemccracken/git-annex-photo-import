@@ -39,6 +39,7 @@ logging.basicConfig(filename='git-annex-photo-import.log', level=logging.DEBUG)
 def timestruct_from_metadata(m):
     if CREATION_DATE_KEY not in m:
         sourcefilename = m["SourceFile"]
+        logging.info("no EXIF creation date for {}, using mtime.".format(sourcefilename))
         st = os.stat(sourcefilename)
         timestruct = time.localtime(st.st_mtime)
         # NOTE: os x ctime seems odd so I go with mtime, which is what the Finder reports as "created" anyway
@@ -163,11 +164,13 @@ def GetGps(data):
 
 def place_info_from_metadata(m):
     gps = GetGps(m)
-    if gps is None: return m
+    if gps is None:
+        logging.info("no lat, lng for file {}, skipping".format(m["SourceFile"]))
+        return {}
 
     lat, lng, alt = gps
     if "unknown" in [lat, lng]:
-        logging.debug("no lat, lng for file {}, skipping".format(m["SourceFile"]))
+        logging.info("no lat, lng for file {}, skipping".format(m["SourceFile"]))
         return {}
 
     ut = "http://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&sensor=false"
