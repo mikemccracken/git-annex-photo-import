@@ -174,12 +174,12 @@ UNKNOWN_PLACE_DICT = {"Formatted Address": "unknown",
 def place_info_from_metadata(m):
     gps = GetGps(m)
     if gps is None:
-        logging.info("no lat, lng for file {}, skipping".format(m["SourceFile"]))
+        logging.info("no lat, lng for file {}, using 'unknown'".format(m["SourceFile"]))
         return UNKNOWN_PLACE_DICT
 
     lat, lng, alt = gps
     if "unknown" in [lat, lng]:
-        logging.info("no lat, lng for file {}, skipping".format(m["SourceFile"]))
+        logging.info("no lat, lng for file {}, using 'unknown'".format(m["SourceFile"]))
         return UNKNOWN_PLACE_DICT
 
     ut = "http://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&sensor=false"
