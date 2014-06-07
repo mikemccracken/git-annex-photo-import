@@ -19,7 +19,7 @@ from urllib import urlopen
 #TODO py3.3 uses shlex.quote
 from pipes import quote
 
-USE_STAGING = True              # rename into temp dir
+USE_STAGING = True # True means copy then import the copy, avoids deleting the original
 
 WANTED_KEYS_EXIFTOOL = ['CreateDate', 'GPSLongitude', 'GPSLongitudeRef', 'GPSLatitude', 'GPSLatitudeRef', 'ImageDescription', 'Model', 'Year', 'Month', 'Day', 'SourceFile', 'GPSImgDirection', 'GPSImgDirectionRef', 'GPSAltitude', 'GPSAltitudeRef']
 # for reference while hacking:
@@ -244,8 +244,10 @@ if __name__ == '__main__':
     os.chdir(annexpath)
     
     if USE_STAGING:
-        staging_dir = tempfile.mkdtemp("git-annex-import", dir="/tmp")
-        logging.info("using staging dir ={}".format(staging_dir))
+        staging_dir = os.getenv("STAGING_DIR")
+        if not staging_dir:
+            staging_dir = tempfile.mkdtemp("git-annex-import", dir="/tmp")
+        logging.info("using staging dir '{}'".format(staging_dir))
     else:
         staging_dir = ""
 
