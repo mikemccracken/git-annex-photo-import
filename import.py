@@ -33,7 +33,7 @@ WANTED_KEYS = ['Year', 'Month', 'Day', 'SourceFile'] + WANTED_KEYS_EXIFREAD + GE
 
 CREATION_DATE_KEY = 'EXIF DateTimeOriginal'
 
-logging.basicConfig(filename='git-annex-photo-import.log', level=logging.DEBUG)
+logging.basicConfig(filename='git-annex-photo-import.log', level=logging.INFO)
 
 
 def timestruct_from_metadata(m):
@@ -52,10 +52,11 @@ def timestruct_from_metadata(m):
 
 def filename_from_metadata(m):
     sourcefilename = m["SourceFile"]
-    ignore, extension = os.path.splitext(sourcefilename)
+    basename = os.path.basename(sourcefile)
+    base, extension = os.path.splitext(basename)
     timestruct = timestruct_from_metadata(m)
     filename = time.strftime("%H:%M:%S-%B-%d-%Y", timestruct)
-    return filename + extension
+    return "{}-{}{}".format(filename, base, extension)
 
 def import_files(filenames):
     if len(filenames) == 0:
