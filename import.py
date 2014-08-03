@@ -50,13 +50,16 @@ def timestruct_from_metadata(m):
     timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S") 
     return timestruct
 
+
 def filename_from_metadata(m):
     sourcefilename = m["SourceFile"]
     basename = os.path.basename(sourcefilename)
     base, extension = os.path.splitext(basename)
+    extension = extension.upper()
     timestruct = timestruct_from_metadata(m)
-    filename = time.strftime("%H:%M:%S-%B-%d-%Y", timestruct)
+    filename = time.strftime("%Y-%B-%d_%H_%M_%S", timestruct)
     return "{}-{}{}".format(filename, base, extension)
+
 
 def import_files(filenames):
     if len(filenames) == 0:
@@ -243,7 +246,9 @@ if __name__ == '__main__':
         sys.exit(1)
     annexpath = sys.argv[1]
     os.chdir(annexpath)
-    
+
+    logging.info("import.py started {}".format(time.asctime()))
+
     if USE_STAGING:
         staging_dir = os.getenv("STAGING_DIR")
         if not staging_dir:
@@ -254,11 +259,17 @@ if __name__ == '__main__':
 
     files_to_import = []
 
-    #mlist = get_metadata_using_exiftool(sys.argv[2:])
-    mlist = get_metadata_using_exifread(sys.argv[2:])
-
+    fnargs = sys.argv[2:]
+    logging.info("Received {} filenames as arguments".format(len(fnargs)))
+    #mlist = get_metadata_using_exiftool(fnargs)
+    mlist = get_metadata_using_exifread(fnargs)
+    logging.info("Got metadata for {} filenames".format(len(mlist)))
     for m in mlist:
         source_file_name = m['SourceFile']
+        print("metadata from sourcefile {} :".format(source_file_name))
+        import pprint
+        pprint.pprint(m)
+
         m["filename_for_git_annex"] = filename_from_metadata(m)
         filename_for_git_annex = os.path.join(staging_dir, m["filename_for_git_annex"])
         if USE_STAGING:
@@ -269,7 +280,8 @@ if __name__ == '__main__':
             shutil.move(source_file_name, filename_for_git_annex)
 
         files_to_import.append(filename_for_git_annex)
-        
+
+    logging.info("About to import {} files".format(len(files_to_import)))
     success = import_files(files_to_import)
     if success == False:
         # todo: remove temp dir?
@@ -283,10 +295,11 @@ if __name__ == '__main__':
                   Month=ts.tm_mon,
                   Day=ts.tm_mday))
 
-        m.update(place_info_from_metadata(m))
+        if not os.getenv("SKIP_PLACE_INFO", False):
+            m.update(place_info_from_metadata(m))
 
         add_metadata_to_imported_file(m)
-            
+
     if staging_dir != "":
         logging.debug("removing {}".format(staging_dir))
         shutil.rmtree(staging_dir)
