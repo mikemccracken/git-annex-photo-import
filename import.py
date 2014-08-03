@@ -28,7 +28,7 @@ ALL_KEYS_EXIFTOOL = ['YResolution', 'GPSImgDirectionRef', 'ResolutionUnit', 'Fil
 
 WANTED_KEYS_EXIFREAD = ['EXIF DateTimeOriginal', 'GPS GPSLongitude', 'GPS GPSLongitudeRef', 'GPS GPSLatitude', 'GPS GPSLatitudeRef', 'Image ImageDescription', 'Image Model', 'GPS GPSImgDirection', 'GPS GPSImgDirectionRef', 'GPS GPSAltitude', 'GPS GPSAltitudeRef']
 
-GEOCODE_KEYS = ['County', 'Formatted Address', 'State', 'Country', 'Locality', 'Neighborhood', 'Postal Code', 'Route'] 
+GEOCODE_KEYS = ['County', 'Formatted Address', 'State', 'Country', 'Locality', 'Neighborhood', 'Postal Code', 'Route']
 WANTED_KEYS = ['Year', 'Month', 'Day', 'SourceFile'] + WANTED_KEYS_EXIFREAD + GEOCODE_KEYS
 
 CREATION_DATE_KEY = 'EXIF DateTimeOriginal'
@@ -47,7 +47,7 @@ def timestruct_from_metadata(m):
     datetimestr = m[CREATION_DATE_KEY]
     if USE_EXIFREAD:
         datetimestr = datetimestr.values
-    timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S") 
+    timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S")
     return timestruct
 
 
@@ -71,7 +71,7 @@ def import_files(filenames):
         try:
             logging.info("importing {}".format(filename))
             cmd = "git-annex import '{}'".format(filename)
-            out = subprocess.check_output(cmd, shell=True, 
+            out = subprocess.check_output(cmd, shell=True,
                                           stderr=subprocess.STDOUT,
                                           env=os.environ) # TODO: hack for PATH
             logging.info("- success")
@@ -82,13 +82,14 @@ def import_files(filenames):
                 logging.error("error in import: {code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
                 logging.info("stopping import.")
                 return False
-    
+
+
 def add_metadata_to_imported_file(m):
     addmdcmd = "git -c annex.alwayscommit=false annex metadata \"{fname}\" -s {kvstr} --quiet"
 
     for k,v in m.items():
 
-        if k not in WANTED_KEYS: 
+        if k not in WANTED_KEYS:
             continue
 
         key = k.split(" ")[-1]
@@ -98,7 +99,7 @@ def add_metadata_to_imported_file(m):
             kvstr = quote("{key}={value}".format(key=str(key), value=str(v)))
             cmd = addmdcmd.format(fname=fn, kvstr=kvstr)
             logging.debug("\t - " + cmd)
-            out = subprocess.check_output(cmd, shell=True,                                    
+            out = subprocess.check_output(cmd, shell=True,
                                           stderr=subprocess.STDOUT,
                                           env=os.environ) # TODO: hack for PATH
         except subprocess.CalledProcessError as e:
@@ -220,7 +221,7 @@ def place_info_from_metadata(m):
     pprint.pprint(m)
 
     return m
-    
+
 
 def get_metadata_using_exiftool(filenames):
     filenames = " ".join(filenames)
