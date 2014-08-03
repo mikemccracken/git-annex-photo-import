@@ -1,9 +1,11 @@
 #! python3
 
+import argparse
 from collections import defaultdict
 import json
 import logging
 import os
+import pprint
 import shutil
 import subprocess
 import sys
@@ -33,8 +35,10 @@ WANTED_KEYS = ['Year', 'Month', 'Day', 'SourceFile'] + WANTED_KEYS_EXIFREAD + GE
 
 CREATION_DATE_KEY = 'EXIF DateTimeOriginal'
 
-logging.basicConfig(filename='git-annex-photo-import.log', level=logging.INFO)
-
+def setupLogging(echo_to_stderr=False):
+    logging.basicConfig(filename='git-annex-photo-import.log', level=logging.INFO)
+    if echo_to_stderr:
+        logging.getLogger('').addHandler(logging.StreamHandler())
 
 def timestruct_from_metadata(m):
     if CREATION_DATE_KEY not in m:
@@ -217,9 +221,6 @@ def place_info_from_metadata(m):
         if actype in actypemap:
             m[actypemap[actype]] = ac["long_name"]
 
-    import pprint
-    pprint.pprint(m)
-
     return m
 
 
@@ -241,14 +242,35 @@ def get_metadata_using_exifread(filenames):
     return mlist
 
 
-if __name__ == '__main__':
-    if len(sys.argv) < 3:
-        print("Usage: import.py [destination annex path] filename(s)")
-        sys.exit(1)
-    annexpath = sys.argv[1]
-    os.chdir(annexpath)
+def expand_filenames(opts, fnargs):
+    "recurse"
+    r = []
+    for arg in fnargs:
 
+        arg = os.path.abspath(arg)
+
+        if os.path.basename(arg).startswith("."):
+            logging.info("ignoring dotfile:" + arg)
+            continue
+
+        if os.path.isdir(arg):
+            if opts.recursive:
+                abs_list = [os.path.join(arg, a) for a in os.listdir(arg)]
+                r += expand_filenames(opts, abs_list)
+            else:
+                logging.info("ignoring directory " + arg)
+        else:
+            r.append(os.path.abspath(arg))
+
+    return r
+
+
+def main(opts):
     logging.info("import.py started {}".format(time.asctime()))
+
+    fnargs = expand_filenames(opts, opts.fnargs)
+
+    os.chdir(opts.annex)
 
     if USE_STAGING:
         staging_dir = os.getenv("STAGING_DIR")
@@ -260,7 +282,13 @@ if __name__ == '__main__':
 
     files_to_import = []
 
-    fnargs = sys.argv[2:]
+
+    if opts.dryrun:
+        pprint.pprint("filenames to import: ")
+        pprint.pprint(fnargs)
+        print("number of filenames: {}".format(len(fnargs)))
+        sys.exit()
+
     logging.info("Received {} filenames as arguments".format(len(fnargs)))
     #mlist = get_metadata_using_exiftool(fnargs)
     mlist = get_metadata_using_exifread(fnargs)
@@ -268,7 +296,6 @@ if __name__ == '__main__':
     for m in mlist:
         source_file_name = m['SourceFile']
         print("metadata from sourcefile {} :".format(source_file_name))
-        import pprint
         pprint.pprint(m)
 
         m["filename_for_git_annex"] = filename_from_metadata(m)
@@ -307,3 +334,25 @@ if __name__ == '__main__':
 
 #TODO - commit at end
 # TODO: exifread doesn't do MOV :(
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('annex',
+                        help='destination git-annex directory')
+    # parser.add_argument('--staging-dir',
+    #                     help='directory to copy to before importing.'
+    #                     ' (default is no copy, moving sources immediately)')
+    parser.add_argument('-r', dest='recursive', action='store_true',
+                        help='import all files from subdirectories')
+    parser.add_argument('-v', dest='verbose', action='store_true',
+                        help='echo logging to stderr')
+    parser.add_argument('--dryrun', action='store_true',
+                        help='show actions that would be performed')
+    parser.add_argument('fnargs', nargs=argparse.REMAINDER,
+                        help='file names and directories to import from')
+    opts = parser.parse_args()
+
+    setupLogging(opts.verbose)
+
+    main(opts)
