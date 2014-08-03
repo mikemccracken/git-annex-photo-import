@@ -274,9 +274,14 @@ def main(opts):
 
     if USE_STAGING:
         staging_dir = os.getenv("STAGING_DIR")
+        staging_dir = os.path.abspath(staging_dir)
         if not staging_dir:
             staging_dir = tempfile.mkdtemp("git-annex-import", dir="/tmp")
-        logging.info("using staging dir '{}'".format(staging_dir))
+        if not os.path.exists(staging_dir):
+            logging.info("creating staging dir '{}'".format(staging_dir))
+            os.mkdir(staging_dir)
+        else:
+            logging.info("using existing staging dir '{}'".format(staging_dir))
     else:
         staging_dir = ""
 
