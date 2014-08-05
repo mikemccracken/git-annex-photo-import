@@ -51,7 +51,17 @@ def timestruct_from_metadata(m):
     datetimestr = m[CREATION_DATE_KEY]
     if USE_EXIFREAD:
         datetimestr = datetimestr.values
-    timestruct = time.strptime(datetimestr, "%Y:%m:%d %H:%M:%S")
+
+    expected_time_format = "%Y:%m:%d %H:%M:%S"
+    try:
+        timestruct = time.strptime(datetimestr, expected_time_format)
+    except ValueError:
+        # let's hope the seconds is just weird:
+        length_without_seconds = len("2007:05:05 11:39")
+        newdts = datetimestr[:length_without_seconds]
+        logging.warning("NOTE: datetime in wrong format ({}),"
+                        " trying again with".format(datetimestr, newdts))
+        timestruct = time.strptime(newdts, "%Y:%m:%d %H:%M")
     return timestruct
 
 
