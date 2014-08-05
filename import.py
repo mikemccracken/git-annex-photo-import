@@ -35,10 +35,25 @@ WANTED_KEYS = ['Year', 'Month', 'Day', 'SourceFile'] + WANTED_KEYS_EXIFREAD + GE
 
 CREATION_DATE_KEY = 'EXIF DateTimeOriginal'
 
-def setupLogging(echo_to_stderr=False):
+ROWS, COLS = os.popen('stty size', 'r').read().split()
+
+def show_status(at, total, extra=""):
+
+    pct = float(at) / total
+    numbers = "{} of {}: ".format(at, total)
+    remaining = int(COLS) - len(numbers) - len(extra) - 1
+    prog = "=" * (int(pct * remaining) )
+    space = " " * int((1.0 - pct) * remaining)
+    bar = "[{}{}]".format(prog, space)
+    sys.stderr.write("\r{}{}{}".format(numbers, extra, bar))
+    sys.stderr.flush()
+
+
+def setup_logging(echo_to_stderr=False):
     logging.basicConfig(filename='git-annex-photo-import.log', level=logging.INFO)
     if echo_to_stderr:
         logging.getLogger('').addHandler(logging.StreamHandler())
+
 
 def timestruct_from_metadata(m):
     if CREATION_DATE_KEY not in m:
@@ -81,6 +96,8 @@ def import_files(filenames):
     # TODO: calling import per file is less efficient but helps with
     # errors. is there a better way?
 
+    import_count = 0
+    skip_count = 0
     for filename in filenames:
         try:
             logging.info("importing {}".format(filename))
@@ -88,10 +105,15 @@ def import_files(filenames):
             out = subprocess.check_output(cmd, shell=True,
                                           stderr=subprocess.STDOUT,
                                           env=os.environ) # TODO: hack for PATH
+            import_count += 1
             logging.info("- success")
+            if opts.verbose:
+                show_status(import_count, len(filenames), " ({} skips)".format(skip_count))
+
         except subprocess.CalledProcessError as e:
             if e.returncode == 1 and "not overwriting existing" in e.output:
                 logging.warn("- skipping existing file.")
+                skip_count += 1
             else:
                 logging.error("error in import: {code}\noutput:\n{output}".format(code=e.returncode, output=e.output))
                 logging.info("stopping import.")
@@ -241,14 +263,18 @@ def get_metadata_using_exiftool(filenames):
     mlist = [defaultdict(lambda: "unknown", **m_raw) for m_raw in raw_mlist]
     return mlist
 
-def get_metadata_using_exifread(filenames):
+def get_metadata_using_exifread(filenames, opts):
     mlist = []
+    files_processed = 0
     for fn in filenames:
         with open(fn) as f:
             # details = false to avoid parsing thumbs for now:
             m = exifread.process_file(f, 'unknown', details=False)
             m["SourceFile"] = os.path.abspath(fn)
             mlist.append(m)
+            files_processed += 1
+            if opts.verbose:
+                show_status(files_processed, len(filenames))
     return mlist
 
 
@@ -304,24 +330,40 @@ def main(opts):
         print("number of filenames: {}".format(len(fnargs)))
         sys.exit()
 
-    logging.info("Received {} filenames as arguments".format(len(fnargs)))
+    logging.info("Received {} filenames as arguments. Getting metadata.".format(len(fnargs)))
     #mlist = get_metadata_using_exiftool(fnargs)
-    mlist = get_metadata_using_exifread(fnargs)
-    logging.info("Got metadata for {} filenames".format(len(mlist)))
+    mlist = get_metadata_using_exifread(fnargs, opts)
+    logging.info("Got metadata for {} filenames, copying.".format(len(mlist)))
+
+    for m in mlist:
+        try:
+            m["filename_for_git_annex"] = filename_from_metadata(m)
+        except Exception as e:
+            source_file_name = m['SourceFile']
+            logging.exception("error getting filename from metadata for source_file_name={}".format(source_file_name)) 
+            pprint.pprint(m)
+            raise e
+
+    moved_count = 0
     for m in mlist:
         source_file_name = m['SourceFile']
-        print("metadata from sourcefile {} :".format(source_file_name))
-        pprint.pprint(m)
+        # print("metadata from sourcefile {} :".format(source_file_name))
+        # pprint.pprint(m)
 
-        m["filename_for_git_annex"] = filename_from_metadata(m)
         filename_for_git_annex = os.path.join(staging_dir, m["filename_for_git_annex"])
+
         if USE_STAGING:
-            logging.info("copying {} to {}".format(source_file_name, filename_for_git_annex))
+            infostr = "copying {} to {}".format(source_file_name, filename_for_git_annex)
+            logging.debug(infostr)
             shutil.copy2(source_file_name, filename_for_git_annex)
         else:
-            logging.info("moving {} to {}".format(source_file_name, filename_for_git_annex))
+            infostr = "moving {} to {}".format(source_file_name, filename_for_git_annex)
+            logging.debug(infostr)
             shutil.move(source_file_name, filename_for_git_annex)
 
+        moved_count += 1
+        if opts.verbose:
+            show_status(moved_count, len(mlist), infostr)
         files_to_import.append(filename_for_git_annex)
 
     logging.info("About to import {} files".format(len(files_to_import)))
@@ -331,6 +373,8 @@ def main(opts):
         logging.error("errors importing files. exiting.")
         sys.exit()
 
+    logging.info("Updating metadata")
+    updated_count = 0
     for m in mlist:
         ts = timestruct_from_metadata(m)
 
@@ -342,6 +386,10 @@ def main(opts):
             m.update(place_info_from_metadata(m))
 
         add_metadata_to_imported_file(m)
+        updated_count += 1
+        if opts.verbose:
+            show_status(updated_count, len(mlist))
+
 
     if staging_dir != "":
         logging.debug("removing {}".format(staging_dir))
@@ -368,6 +416,6 @@ if __name__ == '__main__':
                         help='file names and directories to import from')
     opts = parser.parse_args()
 
-    setupLogging(opts.verbose)
+    setup_logging(opts.verbose)
 
     main(opts)
