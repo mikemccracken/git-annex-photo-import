@@ -68,6 +68,8 @@ This metadata allows you to do nice things with git-annex views like this:
 lrwxr-xr-x  1 mmccrack  staff   204B Aug  4 07:43 2011-12-02_18:31:52-IMG_1161.JPG -> ../../.git/annex/objects/gp/Wz/SHA256E-s1617420--96cd231aeab6f53379eb7ee7ecc6153f78132deec47cbaf795c572281654ecd1.JPG/SHA256E-s1617420--96cd231aeab6f53379eb7ee7ecc6153f78132deec47cbaf795c572281654ecd1.JPG
 ```
 
+*NOTE*: switching views like this in git annex is currently very slow on large files. With around 10,000 images, the above view comand took 8 minutes on my system (not an SSD).
+
 ## Caveats 
 
 Note that you currently have to do the final 'git commit' yourself
